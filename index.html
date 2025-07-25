@@ -95,6 +95,7 @@
         .file-item-icon { font-size: 1.5rem; margin-right: 1rem; color: var(--primary-dark); }
         .file-info { flex-grow: 1; }
         .file-name { font-weight: 600; }
+        .file-details { font-size: 0.8rem; color: var(--gray-600); }
         .delete-btn { background: transparent; border: none; color: var(--error-color); cursor: pointer; font-size: 1.1rem; opacity: 0.7; transition: var(--transition);}
         .delete-btn:hover { opacity: 1; transform: scale(1.2); }
         #progress-container { margin-top: 1.5rem; display: none; padding: 0 0.5rem; }
@@ -113,6 +114,25 @@
         .result-success .result-icon { background-color: var(--success-color); }
         .result-error .result-icon { background-color: var(--error-color); }
         .spinner { display: inline-block; width: 1.2rem; height: 1.2rem; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 1s linear infinite; }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);
+            display: none; justify-content: center; align-items: center; z-index: 1000; animation: fadeIn 0.3s;
+        }
+        .modal-content {
+            background: white; padding: 2rem; border-radius: var(--radius-card); box-shadow: var(--shadow-xl);
+            width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;
+        }
+        .modal-header { margin-bottom: 1.5rem; }
+        .modal-title { font-size: 1.5rem; font-weight: 700; }
+        .modal-filename { font-size: 0.9rem; color: var(--gray-600); word-break: break-all; }
+        .modal-body ul { list-style: none; margin-bottom: 1.5rem; }
+        .modal-body li { padding: 0.5rem 0; }
+        .modal-body label { display: flex; align-items: center; cursor: pointer; }
+        .modal-body input[type="checkbox"] { margin-right: 0.75rem; width: 18px; height: 18px; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 1rem; }
+
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -134,7 +154,7 @@
                     <div id="csv-tab" class="tab-content active">
                         <p class="info-text">For CSV or Excel files, the first row must contain these headers. The column order does not matter but it must contain all header case sensitive.</p>
                         <ul class="columns-list">
-                            <li><code>date</code></li><li><code>year</code></li><li><code>class</code></li><li><code>month</code></li><li><code>region</code></li><li><code>pharmacy</code></li><li><code>totalPrescription</code></li><li><code>insuranceCoveredPrescription</code></li><li><code>المسكنات</code></li><li><code>مضادات حيوية</code></li><li><code>كلي</code></li><li><code>نفسية و عصبية</code></li><li><code>قلب</code></li><li><code>سكر حقن</code></li><li><code>سكر فم</code></li><li><code>نسا</code></li><li><code>كبد</code></li><li><code>جهاز هضمي</code></li><li><code>جهاز تنفسي</code></li><li><code>امراض جلدية</code></li><li><code>عيون و رمد</code></li><li><code>انف و اذن</code></li><li><code>مضادات تقلصات</code></li><li><code>اورام</code></li><li><code>فيتامينات</code></li><li><code>مختلفة</code></li>
+                           <li><code>date</code></li><li><code>year</code></li><li><code>class</code></li><li><code>month</code></li><li><code>region</code></li><li><code>pharmacy</code></li><li><code>totalPrescription</code></li><li><code>insuranceCoveredPrescription</code></li><li><code>المسكنات</code></li><li><code>مضادات حيوية</code></li><li><code>كلي</code></li><li><code>نفسية و عصبية</code></li><li><code>قلب</code></li><li><code>سكر حقن</code></li><li><code>سكر فم</code></li><li><code>نسا</code></li><li><code>كبد</code></li><li><code>جهاز هضمي</code></li><li><code>جهاز تنفسي</code></li><li><code>امراض جلدية</code></li><li><code>عيون و رمد</code></li><li><code>انف و اذن</code></li><li><code>مضادات تقلصات</code></li><li><code>اورام</code></li><li><code>فيتامينات</code></li><li><code>مختلفة</code></li>
                         </ul>
                         <div class="template-actions">
                             <button id="download-csv-btn" class="btn btn-primary"><i class="fas fa-download"></i> Download CSV Template</button>
@@ -179,24 +199,53 @@
         </main>
     </div>
 
+    <!-- Sheet Selector Modal -->
+    <div id="sheet-selector-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Select Sheets to Upload</h3>
+                <p id="modal-filename" class="modal-filename"></p>
+            </div>
+            <div class="modal-body">
+                <ul id="modal-sheet-list"></ul>
+            </div>
+            <div class="modal-footer">
+                <button id="modal-cancel-btn" class="btn btn-secondary">Cancel</button>
+                <button id="modal-confirm-btn" class="btn btn-primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+
     <script>
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwW672qP-Y3o9168U0-5C_4oV9d6Qp3c2f0L0nF5a0l5X3G8y9Z9j8R7T6-/exec";
         const HEADERS = ['date','year','class','month','region','pharmacy','totalPrescription','insuranceCoveredPrescription','المسكنات','مضادات حيوية','كلي','نفسية و عصبية','قلب','سكر حقن','سكر فم','نسا','كبد','جهاز هضمي','جهاز تنفسي','امراض جلدية','عيون و رمد','انف و اذن','مضادات تقلصات','اورام','فيتامينات','مختلفة'];
         const DOM = {
-            dropArea: document.getElementById('drop-area'), fileInput: document.getElementById('file-input'),
-            fileList: document.getElementById('file-list'), uploadBtn: document.getElementById('upload-btn'),
-            resultsContainer: document.getElementById('results-container'), resultsList: document.getElementById('results-list'),
-            downloadCsvBtn: document.getElementById('download-csv-btn'), downloadJsonBtn: document.getElementById('download-json-btn'),
-            jsonExampleEl: document.getElementById('json-example'), progressContainer: document.getElementById('progress-container'),
-            progressBar: document.getElementById('progress-bar'), progressText: document.getElementById('progress-text'),
+            dropArea: document.getElementById('drop-area'),
+            fileInput: document.getElementById('file-input'),
+            fileList: document.getElementById('file-list'),
+            uploadBtn: document.getElementById('upload-btn'),
+            resultsContainer: document.getElementById('results-container'),
+            resultsList: document.getElementById('results-list'),
+            downloadCsvBtn: document.getElementById('download-csv-btn'),
+            downloadJsonBtn: document.getElementById('download-json-btn'),
+            jsonExampleEl: document.getElementById('json-example'),
+            progressContainer: document.getElementById('progress-container'),
+            progressBar: document.getElementById('progress-bar'),
+            progressText: document.getElementById('progress-text'),
+            sheetModal: document.getElementById('sheet-selector-modal'),
+            modalFilename: document.getElementById('modal-filename'),
+            modalSheetList: document.getElementById('modal-sheet-list'),
+            modalConfirmBtn: document.getElementById('modal-confirm-btn'),
+            modalCancelBtn: document.getElementById('modal-cancel-btn'),
         };
         let filesToUpload = [];
-        
+
         function initialize() {
             const preventDefaults = e => { e.preventDefault(); e.stopPropagation(); };
-            ['dragenter','dragover','dragleave','drop'].forEach(e => DOM.dropArea.addEventListener(e, preventDefaults));
-            ['dragenter','dragover'].forEach(e => DOM.dropArea.addEventListener(e, () => DOM.dropArea.classList.add('drag-active')));
-            ['dragleave','drop'].forEach(e => DOM.dropArea.addEventListener(e, () => DOM.dropArea.classList.remove('drag-active')));
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => DOM.dropArea.addEventListener(e, preventDefaults));
+            ['dragenter', 'dragover'].forEach(e => DOM.dropArea.addEventListener(e, () => DOM.dropArea.classList.add('drag-active')));
+            ['dragleave', 'drop'].forEach(e => DOM.dropArea.addEventListener(e, () => DOM.dropArea.classList.remove('drag-active')));
             DOM.dropArea.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
             DOM.fileInput.addEventListener('change', e => handleFiles(e.target.files));
             DOM.uploadBtn.addEventListener('click', handleUpload);
@@ -215,23 +264,94 @@
             DOM.jsonExampleEl.textContent = JSON.stringify(exampleObj, null, 2);
         }
 
-        function handleFiles(newFiles) {
-            for (const file of newFiles) if (!filesToUpload.some(f => f.name === file.name)) filesToUpload.push(file);
+        async function handleFiles(newFiles) {
+            for (const file of newFiles) {
+                if (filesToUpload.some(f => f.file.name === file.name)) continue;
+
+                const fileExt = file.name.split('.').pop().toLowerCase();
+                if (['xlsx', 'xls'].includes(fileExt)) {
+                    await promptForSheetSelection(file);
+                } else {
+                    filesToUpload.push({ file: file, selectedSheets: null });
+                }
+            }
             DOM.fileInput.value = '';
             updateFileListUI();
         }
 
+        function promptForSheetSelection(file) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const data = e.target.result;
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetNames = workbook.SheetNames;
+
+                    if (sheetNames.length <= 1) {
+                        filesToUpload.push({ file: file, selectedSheets: sheetNames });
+                        updateFileListUI();
+                        resolve();
+                        return;
+                    }
+                    
+                    DOM.modalFilename.textContent = file.name;
+                    DOM.modalSheetList.innerHTML = '';
+                    sheetNames.forEach((name, index) => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `<label><input type="checkbox" value="${name}" ${index === 0 ? 'checked' : ''}> ${name}</label>`;
+                        DOM.modalSheetList.appendChild(li);
+                    });
+                    
+                    DOM.sheetModal.style.display = 'flex';
+
+                    const confirmHandler = () => {
+                        const selectedSheets = Array.from(DOM.modalSheetList.querySelectorAll('input:checked')).map(cb => cb.value);
+                        if (selectedSheets.length > 0) {
+                            filesToUpload.push({ file: file, selectedSheets: selectedSheets });
+                        }
+                        cleanupAndResolve();
+                    };
+
+                    const cancelHandler = () => {
+                        cleanupAndResolve();
+                    };
+
+                    const cleanupAndResolve = () => {
+                        DOM.sheetModal.style.display = 'none';
+                        DOM.modalConfirmBtn.removeEventListener('click', confirmHandler);
+                        DOM.modalCancelBtn.removeEventListener('click', cancelHandler);
+                        updateFileListUI();
+                        resolve();
+                    }
+
+                    DOM.modalConfirmBtn.addEventListener('click', confirmHandler);
+                    DOM.modalCancelBtn.addEventListener('click', cancelHandler);
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
         function updateFileListUI() {
             DOM.fileList.innerHTML = '';
-            filesToUpload.forEach((file, index) => {
+            filesToUpload.forEach((fileWrapper, index) => {
+                const file = fileWrapper.file;
                 const item = document.createElement('div');
                 item.className = 'file-item';
                 let iconClass = 'fa-file-alt';
                 if (file.name.endsWith('.json')) iconClass = 'fa-file-code';
                 if (file.name.endsWith('.csv')) iconClass = 'fa-file-csv';
                 if (file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) iconClass = 'fa-file-excel';
-                item.innerHTML = `<i class="fas ${iconClass} file-item-icon"></i><div class="file-info"><div class="file-name">${file.name}</div></div><button class="delete-btn" data-index="${index}"><i class="fas fa-times-circle"></i></button>`;
-                item.querySelector('.delete-btn').onclick = e => { filesToUpload.splice(parseInt(e.currentTarget.dataset.index), 1); updateFileListUI(); };
+                
+                let details = '';
+                if(fileWrapper.selectedSheets){
+                    details = `<div class="file-details">${fileWrapper.selectedSheets.length} sheet(s) selected</div>`;
+                }
+
+                item.innerHTML = `<i class="fas ${iconClass} file-item-icon"></i><div class="file-info"><div class="file-name">${file.name}</div>${details}</div><button class="delete-btn" data-index="${index}"><i class="fas fa-times-circle"></i></button>`;
+                item.querySelector('.delete-btn').onclick = e => {
+                    filesToUpload.splice(parseInt(e.currentTarget.dataset.index), 1);
+                    updateFileListUI();
+                };
                 DOM.fileList.appendChild(item);
             });
             DOM.uploadBtn.disabled = filesToUpload.length === 0;
@@ -261,13 +381,15 @@
             DOM.progressContainer.style.display = 'block';
 
             let allRows = [];
-            for (const file of filesToUpload) {
+            for (const fileWrapper of filesToUpload) {
                 try {
-                    const data = await processFile(file);
-                    let dataArray = Array.isArray(data) ? data : [data];
-                    allRows.push(...dataArray);
-                } catch (error) { addResultItem(file.name, false, `Processing error: ${error.message}`); }
+                    const data = await processFile(fileWrapper);
+                    allRows.push(...data);
+                } catch (error) {
+                    addResultItem(fileWrapper.file.name, false, `Processing error: ${error.message}`);
+                }
             }
+
             if (allRows.length === 0) {
                 DOM.uploadBtn.disabled = false;
                 DOM.progressContainer.style.display = 'none';
@@ -286,9 +408,11 @@
                     const responseText = await sendToGoogleSheet(allRows[i]);
                     if (responseText.trim().toLowerCase() !== "success") throw new Error(responseText);
                     successCount++;
-                } catch (error) { errorCount++; }
+                } catch (error) {
+                    errorCount++;
+                }
             }
-            
+
             DOM.uploadBtn.innerHTML = '<i class="fas fa-check"></i> UPLOAD COMPLETE';
             DOM.progressText.textContent = 'Finished!';
             DOM.resultsContainer.classList.remove('hidden');
@@ -303,13 +427,29 @@
             }, 5000);
         }
 
-        async function processFile(file) {
+        async function processFile(fileWrapper) {
+            const file = fileWrapper.file;
             const fileExt = file.name.split('.').pop().toLowerCase();
-            if (fileExt === 'json') return JSON.parse(await file.text());
+            
+            if (fileExt === 'json') {
+                const data = JSON.parse(await file.text());
+                return Array.isArray(data) ? data : [data];
+            }
+            
             if (['csv', 'xlsx', 'xls'].includes(fileExt)) {
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data);
-                return XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                let allSheetData = [];
+
+                const sheetsToProcess = fileWrapper.selectedSheets || workbook.SheetNames;
+
+                sheetsToProcess.forEach(sheetName => {
+                    if (workbook.Sheets[sheetName]) {
+                        const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                        allSheetData.push(...sheetData);
+                    }
+                });
+                return allSheetData;
             }
             throw new Error('Unsupported file type.');
         }
@@ -320,7 +460,7 @@
             if (!response.ok) throw new Error(`Server error: ${response.statusText}`);
             return await response.text();
         }
-        
+
         function addResultItem(fileName, success, message) {
             const item = document.createElement('div');
             item.className = `result-item ${success ? 'result-success' : 'result-error'}`;
