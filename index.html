@@ -104,18 +104,23 @@
         .progress-text { text-align: center; font-size: 0.9rem; color: var(--gray-600); margin-top: 0.75rem; font-weight: 500;}
         .results-container.hidden { display: none; }
         .results-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; }
-        .result-item { padding: 1.25rem; border-radius: var(--radius-card); margin-bottom: 1rem; border-left: 5px solid; display: flex; align-items: center; gap: 1.25rem; animation: fadeIn 0.5s ease-out;}
+        .result-item { padding: 1.25rem; border-radius: var(--radius-card); margin-bottom: 1rem; border-left: 5px solid; display: flex; align-items: flex-start; gap: 1.25rem; animation: fadeIn 0.5s ease-out;}
         .result-success { border-color: var(--success-color); background-color: rgba(52, 168, 83, 0.05); }
         .result-error { border-color: var(--error-color); background-color: rgba(234, 67, 53, 0.05); }
         .result-icon {
             font-size: 1.5rem; width: 40px; height: 40px; display: flex; align-items: center;
-            justify-content: center; border-radius: 50%; color: #fff;
+            justify-content: center; border-radius: 50%; color: #fff; flex-shrink: 0;
         }
         .result-success .result-icon { background-color: var(--success-color); }
         .result-error .result-icon { background-color: var(--error-color); }
+        .result-details { flex-grow: 1; }
+        .result-message { margin-bottom: 0.5rem; }
+        .error-details {
+            font-size: 0.85rem; color: var(--gray-600); background: rgba(0,0,0,0.03);
+            padding: 0.75rem; border-radius: 0.5rem; margin-top: 0.5rem; font-family: monospace;
+            border: 1px solid rgba(0,0,0,0.1); word-break: break-word;
+        }
         .spinner { display: inline-block; width: 1.2rem; height: 1.2rem; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 1s linear infinite; }
-        
-        /* Modal Styles */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);
             display: none; justify-content: center; align-items: center; z-index: 1000; animation: fadeIn 0.3s;
@@ -142,7 +147,7 @@
         <header class="app-header">
             <h1 class="app-title">Data Uploader</h1>
         </header>
-        
+
         <main>
             <div class="card card-padded">
                 <div class="instructions-container">
@@ -179,9 +184,9 @@
                     </label>
                     <input id="file-input" type="file" class="file-input" accept=".json,.csv,.xlsx,.xls" multiple>
                 </div>
-                
+
                 <div id="file-list" class="file-list"></div>
-                
+
                 <div id="progress-container">
                     <div class="progress-bar-bg"><div id="progress-bar" class="progress-bar"></div></div>
                     <div id="progress-text" class="progress-text"></div>
@@ -191,7 +196,7 @@
                     <i class="fas fa-upload"></i> Upload to Google Sheets
                 </button>
             </div>
-            
+
             <div id="results-container" class="results-container card card-padded hidden">
                 <h2 class="results-title"><i class="fas fa-clipboard-check" style="margin-right: 1rem; color: var(--primary-color);"></i>Upload Report</h2>
                 <div id="results-list"></div>
@@ -199,7 +204,6 @@
         </main>
     </div>
 
-    <!-- Sheet Selector Modal -->
     <div id="sheet-selector-modal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -216,10 +220,10 @@
         </div>
     </div>
 
-
     <script>
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwW672qP-Y3o9168U0-5C_4oV9d6Qp3c2f0L0nF5a0l5X3G8y9Z9j8R7T6-/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzf9AsBFFX_vTlm83Cm94Jbi68w6ncihFosEWnrnyUmzMBOJaibWQU7ffXbH1zcYpaKGg/exec";
         const HEADERS = ['date','year','class','month','region','pharmacy','totalPrescription','insuranceCoveredPrescription','المسكنات','مضادات حيوية','كلي','نفسية و عصبية','قلب','سكر حقن','سكر فم','نسا','كبد','جهاز هضمي','جهاز تنفسي','امراض جلدية','عيون و رمد','انف و اذن','مضادات تقلصات','اورام','فيتامينات','مختلفة'];
+        const UPLOAD_DELAY_MS = 800;
         const DOM = {
             dropArea: document.getElementById('drop-area'),
             fileInput: document.getElementById('file-input'),
@@ -261,13 +265,12 @@
             });
             const exampleObj = {};
             HEADERS.forEach(h => { exampleObj[h] = "..."; });
-            DOM.jsonExampleEl.textContent = JSON.stringify(exampleObj, null, 2);
+            DOM.jsonExampleEl.textContent = JSON.stringify([exampleObj], null, 2);
         }
 
         async function handleFiles(newFiles) {
             for (const file of newFiles) {
                 if (filesToUpload.some(f => f.file.name === file.name)) continue;
-
                 const fileExt = file.name.split('.').pop().toLowerCase();
                 if (['xlsx', 'xls'].includes(fileExt)) {
                     await promptForSheetSelection(file);
@@ -283,27 +286,22 @@
             return new Promise(resolve => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    const data = e.target.result;
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    const workbook = XLSX.read(e.target.result, { type: 'array' });
                     const sheetNames = workbook.SheetNames;
-
                     if (sheetNames.length <= 1) {
                         filesToUpload.push({ file: file, selectedSheets: sheetNames });
                         updateFileListUI();
                         resolve();
                         return;
                     }
-                    
                     DOM.modalFilename.textContent = file.name;
                     DOM.modalSheetList.innerHTML = '';
-                    sheetNames.forEach((name, index) => {
+                    sheetNames.forEach((name) => {
                         const li = document.createElement('li');
-                        li.innerHTML = `<label><input type="checkbox" value="${name}" ${index === 0 ? 'checked' : ''}> ${name}</label>`;
+                        li.innerHTML = `<label><input type="checkbox" value="${name}" checked> ${name}</label>`;
                         DOM.modalSheetList.appendChild(li);
                     });
-                    
                     DOM.sheetModal.style.display = 'flex';
-
                     const confirmHandler = () => {
                         const selectedSheets = Array.from(DOM.modalSheetList.querySelectorAll('input:checked')).map(cb => cb.value);
                         if (selectedSheets.length > 0) {
@@ -311,11 +309,7 @@
                         }
                         cleanupAndResolve();
                     };
-
-                    const cancelHandler = () => {
-                        cleanupAndResolve();
-                    };
-
+                    const cancelHandler = () => cleanupAndResolve();
                     const cleanupAndResolve = () => {
                         DOM.sheetModal.style.display = 'none';
                         DOM.modalConfirmBtn.removeEventListener('click', confirmHandler);
@@ -323,7 +317,6 @@
                         updateFileListUI();
                         resolve();
                     }
-
                     DOM.modalConfirmBtn.addEventListener('click', confirmHandler);
                     DOM.modalCancelBtn.addEventListener('click', cancelHandler);
                 };
@@ -341,12 +334,7 @@
                 if (file.name.endsWith('.json')) iconClass = 'fa-file-code';
                 if (file.name.endsWith('.csv')) iconClass = 'fa-file-csv';
                 if (file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) iconClass = 'fa-file-excel';
-                
-                let details = '';
-                if(fileWrapper.selectedSheets){
-                    details = `<div class="file-details">${fileWrapper.selectedSheets.length} sheet(s) selected</div>`;
-                }
-
+                let details = fileWrapper.selectedSheets ? `<div class="file-details">${fileWrapper.selectedSheets.length} sheet(s) selected</div>` : '';
                 item.innerHTML = `<i class="fas ${iconClass} file-item-icon"></i><div class="file-info"><div class="file-name">${file.name}</div>${details}</div><button class="delete-btn" data-index="${index}"><i class="fas fa-times-circle"></i></button>`;
                 item.querySelector('.delete-btn').onclick = e => {
                     filesToUpload.splice(parseInt(e.currentTarget.dataset.index), 1);
@@ -381,45 +369,78 @@
             DOM.progressContainer.style.display = 'block';
 
             let allRows = [];
+            let fileProcessingErrors = [];
+
             for (const fileWrapper of filesToUpload) {
                 try {
                     const data = await processFile(fileWrapper);
-                    allRows.push(...data);
+                    if (data && data.length > 0) {
+                        allRows.push(...data.map(row => ({ ...row, _sourceFile: fileWrapper.file.name })));
+                    } else {
+                        fileProcessingErrors.push({ fileName: fileWrapper.file.name, error: "No valid data rows found in file" });
+                    }
                 } catch (error) {
-                    addResultItem(fileWrapper.file.name, false, `Processing error: ${error.message}`);
+                    fileProcessingErrors.push({ fileName: fileWrapper.file.name, error: error.message });
                 }
             }
+
+            fileProcessingErrors.forEach(error => {
+                addResultItem(error.fileName, false, `File processing failed: ${error.error}`, error.error);
+            });
 
             if (allRows.length === 0) {
                 DOM.uploadBtn.disabled = false;
                 DOM.progressContainer.style.display = 'none';
-                addResultItem("Upload", false, "No valid data rows found to upload.");
+                addResultItem("Upload", false, "No valid data rows found to upload.", "All files failed to process or contained no data");
                 DOM.resultsContainer.classList.remove('hidden');
                 return;
             }
 
             let successCount = 0, errorCount = 0;
+            let uploadErrors = [];
+
             for (let i = 0; i < allRows.length; i++) {
+                const row = allRows[i];
                 const percentage = Math.round(((i + 1) / allRows.length) * 100);
-                DOM.uploadBtn.innerHTML = `<span class="spinner"></span> UPLOADING`;
-                DOM.progressText.textContent = `Processing row ${i + 1} of ${allRows.length}`;
+                DOM.uploadBtn.innerHTML = `<span class="spinner"></span> UPLOADING...`;
+                DOM.progressText.textContent = `Uploading row ${i + 1} of ${allRows.length}. (This may take a moment due to server limits)`;
                 DOM.progressBar.style.width = percentage + '%';
+
                 try {
-                    const responseText = await sendToGoogleSheet(allRows[i]);
-                    if (responseText.trim().toLowerCase() !== "success") throw new Error(responseText);
-                    successCount++;
+                    const result = await sendSingleRowToGoogleSheet(row);
+                    if (result.success) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        uploadErrors.push({ rowIndex: i + 1, sourceFile: row._sourceFile, error: result.error || "Unknown error" });
+                    }
                 } catch (error) {
                     errorCount++;
+                    uploadErrors.push({ rowIndex: i + 1, sourceFile: row._sourceFile, error: error.message });
+                }
+
+                if (i < allRows.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, UPLOAD_DELAY_MS));
                 }
             }
 
             DOM.uploadBtn.innerHTML = '<i class="fas fa-check"></i> UPLOAD COMPLETE';
             DOM.progressText.textContent = 'Finished!';
             DOM.resultsContainer.classList.remove('hidden');
-            addResultItem("Upload Summary", true, `Successfully uploaded <strong>${successCount}</strong> rows.`);
-            if (errorCount > 0) addResultItem("Upload Errors", false, `Failed to upload <strong>${errorCount}</strong> rows.`);
+
+            if (successCount > 0) {
+                addResultItem("Upload Summary", true, `Successfully uploaded <strong>${successCount}</strong> rows.`);
+            }
+
+            if (errorCount > 0) {
+                const errorDetails = uploadErrors.slice(0, 5).map(err => `Row ${err.rowIndex} (${err.sourceFile}): ${err.error}`).join('\n');
+                const moreErrors = uploadErrors.length > 5 ? `\n... and ${uploadErrors.length - 5} more errors` : '';
+                addResultItem("Upload Errors", false, `Failed to upload <strong>${errorCount}</strong> rows.`, errorDetails + moreErrors);
+            }
+
             setTimeout(() => {
                 DOM.uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload to Google Sheets';
+                DOM.uploadBtn.disabled = false;
                 DOM.progressContainer.style.display = 'none';
                 DOM.progressBar.style.width = '0%';
                 filesToUpload = [];
@@ -430,42 +451,65 @@
         async function processFile(fileWrapper) {
             const file = fileWrapper.file;
             const fileExt = file.name.split('.').pop().toLowerCase();
-            
+
             if (fileExt === 'json') {
                 const data = JSON.parse(await file.text());
-                return Array.isArray(data) ? data : [data];
+                return validateRows(Array.isArray(data) ? data : [data], file.name);
             }
-            
+
             if (['csv', 'xlsx', 'xls'].includes(fileExt)) {
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data);
                 let allSheetData = [];
-
                 const sheetsToProcess = fileWrapper.selectedSheets || workbook.SheetNames;
-
                 sheetsToProcess.forEach(sheetName => {
                     if (workbook.Sheets[sheetName]) {
-                        const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                        const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { raw: false, dateNF: 'YYYY-MM-DD' });
                         allSheetData.push(...sheetData);
                     }
                 });
-                return allSheetData;
+                return validateRows(allSheetData, file.name);
             }
             throw new Error('Unsupported file type.');
         }
 
-        async function sendToGoogleSheet(rowData) {
-            const params = new URLSearchParams({ data: JSON.stringify(rowData) });
-            const response = await fetch(`${SCRIPT_URL}?${params.toString()}`);
-            if (!response.ok) throw new Error(`Server error: ${response.statusText}`);
-            return await response.text();
+        function validateRows(rows, fileName) {
+            return rows.map((row, index) => {
+                const missingHeaders = HEADERS.filter(header => !(header in row));
+                if (missingHeaders.length > 0) {
+                    throw new Error(`Row ${index + 2} in ${fileName} is missing headers: ${missingHeaders.join(', ')}`);
+                }
+                return row;
+            });
         }
 
-        function addResultItem(fileName, success, message) {
+        async function sendSingleRowToGoogleSheet(rowData) {
+            try {
+                const params = new URLSearchParams({ data: JSON.stringify(rowData) });
+                const response = await fetch(`${SCRIPT_URL}?${params.toString()}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const responseText = await response.text();
+
+                if (responseText.trim().toLowerCase().includes("success")) {
+                    return { success: true };
+                } else {
+                    return { success: false, error: responseText };
+                }
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        function addResultItem(fileName, success, message, errorDetails = null) {
             const item = document.createElement('div');
             item.className = `result-item ${success ? 'result-success' : 'result-error'}`;
             const icon = success ? 'check-circle' : 'exclamation-triangle';
-            item.innerHTML = `<div class="result-icon"><i class="fas fa-${icon}"></i></div><div><strong>${fileName}:</strong> ${message}</div>`;
+            let errorDetailsHtml = errorDetails ? `<div class="error-details">${errorDetails}</div>` : '';
+            item.innerHTML = `<div class="result-icon"><i class="fas fa-${icon}"></i></div><div class="result-details"><div class="result-message"><strong>${fileName}:</strong> ${message}</div>${errorDetailsHtml}</div>`;
             DOM.resultsList.appendChild(item);
         }
 
