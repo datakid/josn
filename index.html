@@ -221,6 +221,8 @@
     </div>
 
     <script>
+        const escapeHTML = (str) => String(str).replace(/[&<>'"]/g, match => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[match]));
+
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzf9AsBFFX_vTlm83Cm94Jbi68w6ncihFosEWnrnyUmzMBOJaibWQU7ffXbH1zcYpaKGg/exec";
         const HEADERS = ['date','year','class','month','region','pharmacy','totalPrescription','insuranceCoveredPrescription','المسكنات','مضادات حيوية','كلي','نفسية و عصبية','قلب','سكر حقن','سكر فم','نسا','كبد','جهاز هضمي','جهاز تنفسي','امراض جلدية','عيون و رمد','انف و اذن','مضادات تقلصات','اورام','فيتامينات','مختلفة'];
         const UPLOAD_DELAY_MS = 800;
@@ -298,7 +300,7 @@
                     DOM.modalSheetList.innerHTML = '';
                     sheetNames.forEach((name) => {
                         const li = document.createElement('li');
-                        li.innerHTML = `<label><input type="checkbox" value="${name}" checked> ${name}</label>`;
+                        li.innerHTML = `<label><input type="checkbox" value="${escapeHTML(name)}" checked> ${escapeHTML(name)}</label>`;
                         DOM.modalSheetList.appendChild(li);
                     });
                     DOM.sheetModal.style.display = 'flex';
@@ -335,7 +337,7 @@
                 if (file.name.endsWith('.csv')) iconClass = 'fa-file-csv';
                 if (file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) iconClass = 'fa-file-excel';
                 let details = fileWrapper.selectedSheets ? `<div class="file-details">${fileWrapper.selectedSheets.length} sheet(s) selected</div>` : '';
-                item.innerHTML = `<i class="fas ${iconClass} file-item-icon"></i><div class="file-info"><div class="file-name">${file.name}</div>${details}</div><button class="delete-btn" data-index="${index}"><i class="fas fa-times-circle"></i></button>`;
+                item.innerHTML = `<i class="fas ${iconClass} file-item-icon"></i><div class="file-info"><div class="file-name">${escapeHTML(file.name)}</div>${details}</div><button class="delete-btn" data-index="${index}"><i class="fas fa-times-circle"></i></button>`;
                 item.querySelector('.delete-btn').onclick = e => {
                     filesToUpload.splice(parseInt(e.currentTarget.dataset.index), 1);
                     updateFileListUI();
@@ -385,7 +387,7 @@
             }
 
             fileProcessingErrors.forEach(error => {
-                addResultItem(error.fileName, false, `File processing failed: ${error.error}`, error.error);
+                addResultItem(error.fileName, false, `File processing failed: ${escapeHTML(error.error)}`, error.error);
             });
 
             if (allRows.length === 0) {
@@ -508,8 +510,8 @@
             const item = document.createElement('div');
             item.className = `result-item ${success ? 'result-success' : 'result-error'}`;
             const icon = success ? 'check-circle' : 'exclamation-triangle';
-            let errorDetailsHtml = errorDetails ? `<div class="error-details">${errorDetails}</div>` : '';
-            item.innerHTML = `<div class="result-icon"><i class="fas fa-${icon}"></i></div><div class="result-details"><div class="result-message"><strong>${fileName}:</strong> ${message}</div>${errorDetailsHtml}</div>`;
+            let errorDetailsHtml = errorDetails ? `<div class="error-details">${escapeHTML(errorDetails)}</div>` : '';
+            item.innerHTML = `<div class="result-icon"><i class="fas fa-${icon}"></i></div><div class="result-details"><div class="result-message"><strong>${escapeHTML(fileName)}:</strong> ${message}</div>${errorDetailsHtml}</div>`;
             DOM.resultsList.appendChild(item);
         }
 
